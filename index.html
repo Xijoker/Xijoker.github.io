@@ -128,7 +128,7 @@
             letter-spacing: 1px;
             opacity: 0;
             transform: translateY(20px);
-            transition: opacity 0.6s ease, transform 0.6s ease;
+            transition: opacity 1.2s ease, transform 1.2s ease;
         }
         .line.show {
             opacity: 1;
@@ -161,18 +161,18 @@
         <div id="content">
             <div class="line"> 第一次见到你，</div>
             <div class="line">就觉得世界突然变得明亮。</div>
-            <div class="line">就仿佛你在我的世界开了一扇窗，</div>
+            <div class="line">仿佛你在我的世界开了一扇窗，</div>
             <div class="line">从此阳关都照进来。</div>
             <div class="line">我爱周玉这句话，</div>
             <div class="line">开始生根发芽，</div>
             <div class="line">慢慢的枝繁叶茂，</div>
             <div class="line">整棵树上开满了情歌</div>
-            <div class="line">微风一吹</div>
-            <div class="line">就到了你耳边</div>
-            <div class="line">是我在对你唱</div>
+            <div class="line">微风悄悄经过，</div>
+            <div class="line">就带到了你耳边,</div>
+            <div class="line">是我在对你唱:</div>
         </div>
 
-        <div class="footer">—— 送给最特别的你 ——</div>
+        <div class="footer">—— 致周玉 ——</div>
     </div>
 
     <!-- 背景音乐 -->
@@ -234,7 +234,7 @@
                 lines[lineIndex].classList.add('show');
                 lineIndex++;
                 // 间隔 0.8 秒显示下一行
-                timer = setTimeout(showNextLine, 800);
+                timer = setTimeout(showNextLine, 2000);
             }
 
             // 如果因浏览器策略导致音乐未播放，用户点击页面任意位置时尝试播放
