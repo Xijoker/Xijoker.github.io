@@ -79,6 +79,38 @@
             font-weight: 300;
             letter-spacing: 4px;
         }
+
+        /* ===== 进度条 ===== */
+        #loadingArea {
+            width: 80%;
+            margin: 10px auto 30px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+        }
+        .progress-bar-bg {
+            width: 100%;
+            height: 8px;
+            background: #e0d6d4;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .progress-bar-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #ff6b6b, #ff8e8e);
+            border-radius: 10px;
+            transition: width 0.3s ease;
+        }
+        .loading-text {
+            font-size: 1rem;
+            color: #7a5a56;
+            letter-spacing: 2px;
+            font-weight: 300;
+        }
+
+        /* ===== 拆开按钮（初始隐藏） ===== */
         #openBtn {
             background: #ff6b6b;
             border: none;
@@ -91,6 +123,10 @@
             transition: all 0.3s;
             font-weight: 600;
             letter-spacing: 2px;
+            display: none;
+        }
+        #openBtn.show {
+            display: inline-block;
         }
         #openBtn:hover {
             transform: scale(1.05);
@@ -128,7 +164,7 @@
             letter-spacing: 1px;
             opacity: 0;
             transform: translateY(20px);
-            transition: opacity 1.2s ease, transform 1.2s ease;
+            transition: opacity 0.6s ease, transform 0.6s ease;
         }
         .line.show {
             opacity: 1;
@@ -142,7 +178,6 @@
             color: #b07a76;
             letter-spacing: 2px;
         }
-        /* 当内容显示时，调整底部位置 */
         #content.visible + .footer {
             margin-top: 10px;
         }
@@ -154,39 +189,50 @@
         <div id="envelope">
             <div class="envelope-icon">💌</div>
             <div class="envelope-text">有一封信给你</div>
+
+            <!-- 进度条区域 -->
+            <div id="loadingArea">
+                <div class="progress-bar-bg">
+                    <div class="progress-bar-fill" id="progressFill"></div>
+                </div>
+                <div class="loading-text" id="loadingText">📮 信件接收中</div>
+            </div>
+
+            <!-- 拆开按钮（初始隐藏） -->
             <button id="openBtn">💕 拆开</button>
         </div>
 
         <!-- 表白文字（初始隐藏） -->
         <div id="content">
-            <div class="line"> 第一次见到你，</div>
+            <div class="line">第一次见到你，</div>
             <div class="line">就觉得世界突然变得明亮。</div>
             <div class="line">仿佛你在我的世界开了一扇窗，</div>
-            <div class="line">从此阳关都照进来。</div>
+            <div class="line">从此阳光都照进来。</div>
             <div class="line">我爱周玉这句话，</div>
             <div class="line">开始生根发芽，</div>
             <div class="line">慢慢的枝繁叶茂，</div>
-            <div class="line">整棵树上开满了情歌</div>
+            <div class="line">整棵树上开满了情歌。</div>
             <div class="line">微风悄悄经过，</div>
-            <div class="line">就带到了你耳边,</div>
-            <div class="line">是我在对你唱:</div>
+            <div class="line">就带到了你耳边，</div>
+            <div class="line">是我在对你唱：</div>
         </div>
 
-        <div class="footer">—— 致周玉 ——</div>
+        <div class="footer">—— 给小周的一封信 ——</div>
     </div>
 
     <!-- 背景音乐 -->
-    <audio id="bgMusic" loop preload="auto">
-        <source src="love.mp3" type="audio/mpeg">
+    <audio id="bgMusic" loop preload="auto" src="love.mp3">
         您的浏览器不支持 audio 元素。
     </audio>
 
     <script>
         (function() {
+            const audio = document.getElementById('bgMusic');
             const envelope = document.getElementById('envelope');
             const content = document.getElementById('content');
             const openBtn = document.getElementById('openBtn');
-            const audio = document.getElementById('bgMusic');
+            const progressFill = document.getElementById('progressFill');
+            const loadingText = document.getElementById('loadingText');
             const lines = document.querySelectorAll('.line');
 
             let isOpened = false;
@@ -194,9 +240,58 @@
             let timer = null;
             let allShown = false;
 
-            // 点击拆开
+            // ===== 监听音频加载进度 =====
+            let hasLoaded = false;
+            let fallbackTimer = null;
+
+            // 更新进度条
+            function updateProgress() {
+                if (audio.duration > 0) {
+                    let buffered = audio.buffered;
+                    if (buffered.length > 0) {
+                        let loaded = buffered.end(buffered.length - 1);
+                        let percent = Math.min(100, (loaded / audio.duration) * 100);
+                        progressFill.style.width = percent + '%';
+                    }
+                }
+            }
+
+            audio.addEventListener('progress', updateProgress);
+
+            // 当加载足够流畅播放时触发
+            audio.addEventListener('canplaythrough', function onCanPlay() {
+                if (hasLoaded) return;
+                hasLoaded = true;
+                progressFill.style.width = '100%';
+                document.getElementById('loadingArea').style.display = 'none';
+                openBtn.classList.add('show');
+                audio.removeEventListener('progress', updateProgress);
+                audio.removeEventListener('canplaythrough', onCanPlay);
+                if (fallbackTimer) clearTimeout(fallbackTimer);
+            });
+
+            // 超时保护（15秒后强制显示按钮）
+            fallbackTimer = setTimeout(function() {
+                if (!hasLoaded) {
+                    document.getElementById('loadingArea').style.display = 'none';
+                    openBtn.classList.add('show');
+                    hasLoaded = true;
+                    audio.removeEventListener('progress', updateProgress);
+                }
+            }, 15000);
+
+            // 如果音频已经加载完成（缓存）
+            if (audio.readyState >= 4) {
+                clearTimeout(fallbackTimer);
+                document.getElementById('loadingArea').style.display = 'none';
+                openBtn.classList.add('show');
+                hasLoaded = true;
+                audio.removeEventListener('progress', updateProgress);
+            }
+
+            // ===== 点击拆开 =====
             openBtn.addEventListener('click', function() {
-                if (isOpened) return;
+                if (isOpened || !hasLoaded) return;
                 isOpened = true;
                 openBtn.disabled = true;
 
@@ -205,7 +300,6 @@
 
                 // 2. 显示文字区域（淡入）
                 content.style.display = 'flex';
-                // 强制回流后添加 visible 类以触发淡入
                 requestAnimationFrame(() => {
                     content.classList.add('visible');
                 });
@@ -214,7 +308,6 @@
                 audio.volume = 0.2;
                 audio.play().catch(err => {
                     console.warn('音频播放被阻止，请手动点击页面后重试。');
-                    // 如果被阻止，用户点击页面后会自动播放（见下方辅助监听）
                 });
 
                 // 4. 逐行显示文字
@@ -224,17 +317,33 @@
             // 逐行显示
             function showNextLine() {
                 if (lineIndex >= lines.length) {
-                    // 所有文字已显示完毕
                     allShown = true;
-                    // 调大音量
-                    audio.volume = 0.7;
+                    // 文字全部显示，音乐音量平滑提升
+                    fadeVolume(0.2, 0.7, 2500); // 2.5秒内从0.2升到0.7
                     return;
                 }
-                // 显示当前行
                 lines[lineIndex].classList.add('show');
                 lineIndex++;
-                // 间隔 0.8 秒显示下一行
-                timer = setTimeout(showNextLine, 2000);
+                timer = setTimeout(showNextLine, 1200);
+            }
+
+            // ===== 音量平滑过渡 =====
+            function fadeVolume(from, to, duration) {
+                const startTime = performance.now();
+                const startVol = from;
+                const diff = to - from;
+
+                function step(currentTime) {
+                    const elapsed = currentTime - startTime;
+                    const progress = Math.min(1, elapsed / duration);
+                    // 缓动函数：ease-out 使开始快结束慢，更自然
+                    const eased = 1 - Math.pow(1 - progress, 2);
+                    audio.volume = startVol + diff * eased;
+                    if (progress < 1) {
+                        requestAnimationFrame(step);
+                    }
+                }
+                requestAnimationFrame(step);
             }
 
             // 如果因浏览器策略导致音乐未播放，用户点击页面任意位置时尝试播放
@@ -242,15 +351,13 @@
                 if (isOpened && audio.paused) {
                     audio.play().catch(() => {});
                 }
-                // 只尝试一次
                 document.removeEventListener('click', tryPlay);
             }, { once: true });
 
-            // 可选：如果用户手动点击了页面但音乐仍未播放，可再尝试一次（但上面的已经够了）
-
-            // 清理定时器（预防内存泄漏，但不是必须）
+            // 清理定时器
             window.addEventListener('beforeunload', function() {
                 if (timer) clearTimeout(timer);
+                if (fallbackTimer) clearTimeout(fallbackTimer);
             });
 
         })();
