@@ -164,7 +164,7 @@
             letter-spacing: 1px;
             opacity: 0;
             transform: translateY(20px);
-            transition: opacity 0.6s ease, transform 0.6s ease;
+            transition: opacity 1.2s ease, transform 1.2s ease;
         }
         .line.show {
             opacity: 1;
@@ -240,54 +240,57 @@
             let timer = null;
             let allShown = false;
 
-            // ===== 监听音频加载进度 =====
+            // ===== 更可靠的音频加载检测 =====
             let hasLoaded = false;
             let fallbackTimer = null;
+            const LOAD_THRESHOLD = 0.95; // 加载到95%才算完成
 
-            // 更新进度条
-            function updateProgress() {
-                if (audio.duration > 0) {
+            // 检查加载进度
+            function checkLoading() {
+                if (hasLoaded) return;
+                if (audio.duration > 0 && !isNaN(audio.duration)) {
                     let buffered = audio.buffered;
                     if (buffered.length > 0) {
                         let loaded = buffered.end(buffered.length - 1);
-                        let percent = Math.min(100, (loaded / audio.duration) * 100);
-                        progressFill.style.width = percent + '%';
+                        let percent = loaded / audio.duration;
+                        // 更新进度条
+                        progressFill.style.width = Math.min(100, percent * 100) + '%';
+                        // 如果达到阈值
+                        if (percent >= LOAD_THRESHOLD) {
+                            loadingComplete();
+                        }
                     }
                 }
             }
 
-            audio.addEventListener('progress', updateProgress);
-
-            // 当加载足够流畅播放时触发
-            audio.addEventListener('canplaythrough', function onCanPlay() {
+            function loadingComplete() {
                 if (hasLoaded) return;
                 hasLoaded = true;
                 progressFill.style.width = '100%';
                 document.getElementById('loadingArea').style.display = 'none';
                 openBtn.classList.add('show');
-                audio.removeEventListener('progress', updateProgress);
-                audio.removeEventListener('canplaythrough', onCanPlay);
+                // 移除监听
+                audio.removeEventListener('progress', checkLoading);
+                audio.removeEventListener('loadedmetadata', checkLoading);
                 if (fallbackTimer) clearTimeout(fallbackTimer);
-            });
+            }
 
-            // 超时保护（15秒后强制显示按钮）
+            // 监听进度变化
+            audio.addEventListener('progress', checkLoading);
+            // 当元数据加载完成，获取 duration 后立即检查一次
+            audio.addEventListener('loadedmetadata', checkLoading);
+
+            // 如果已经加载完毕（缓存），手动触发一次检查
+            if (audio.readyState >= 1) {
+                setTimeout(checkLoading, 100);
+            }
+
+            // 超时保护：15秒后如果还未加载完成，强制显示按钮（防止死等）
             fallbackTimer = setTimeout(function() {
                 if (!hasLoaded) {
-                    document.getElementById('loadingArea').style.display = 'none';
-                    openBtn.classList.add('show');
-                    hasLoaded = true;
-                    audio.removeEventListener('progress', updateProgress);
+                    loadingComplete(); // 强制完成
                 }
             }, 15000);
-
-            // 如果音频已经加载完成（缓存）
-            if (audio.readyState >= 4) {
-                clearTimeout(fallbackTimer);
-                document.getElementById('loadingArea').style.display = 'none';
-                openBtn.classList.add('show');
-                hasLoaded = true;
-                audio.removeEventListener('progress', updateProgress);
-            }
 
             // ===== 点击拆开 =====
             openBtn.addEventListener('click', function() {
@@ -298,7 +301,7 @@
                 // 1. 信封淡出
                 envelope.classList.add('hidden');
 
-                // 2. 显示文字区域（淡入）
+                // 2. 显示文字区域
                 content.style.display = 'flex';
                 requestAnimationFrame(() => {
                     content.classList.add('visible');
@@ -306,6 +309,7 @@
 
                 // 3. 开始播放音乐（小音量）
                 audio.volume = 0.2;
+                // 因为已加载足够，play() 通常很流畅
                 audio.play().catch(err => {
                     console.warn('音频播放被阻止，请手动点击页面后重试。');
                 });
@@ -318,25 +322,22 @@
             function showNextLine() {
                 if (lineIndex >= lines.length) {
                     allShown = true;
-                    // 文字全部显示，音乐音量平滑提升
-                    fadeVolume(0.2, 0.7, 2500); // 2.5秒内从0.2升到0.7
+                    fadeVolume(0.2, 0.7, 2500);
                     return;
                 }
                 lines[lineIndex].classList.add('show');
                 lineIndex++;
-                timer = setTimeout(showNextLine, 1200);
+                timer = setTimeout(showNextLine, 2000);
             }
 
-            // ===== 音量平滑过渡 =====
+            // 音量平滑过渡
             function fadeVolume(from, to, duration) {
                 const startTime = performance.now();
                 const startVol = from;
                 const diff = to - from;
-
                 function step(currentTime) {
                     const elapsed = currentTime - startTime;
                     const progress = Math.min(1, elapsed / duration);
-                    // 缓动函数：ease-out 使开始快结束慢，更自然
                     const eased = 1 - Math.pow(1 - progress, 2);
                     audio.volume = startVol + diff * eased;
                     if (progress < 1) {
@@ -346,7 +347,7 @@
                 requestAnimationFrame(step);
             }
 
-            // 如果因浏览器策略导致音乐未播放，用户点击页面任意位置时尝试播放
+            // 辅助：用户点击页面任意位置尝试播放（如果被阻止）
             document.addEventListener('click', function tryPlay() {
                 if (isOpened && audio.paused) {
                     audio.play().catch(() => {});
@@ -354,7 +355,7 @@
                 document.removeEventListener('click', tryPlay);
             }, { once: true });
 
-            // 清理定时器
+            // 清理
             window.addEventListener('beforeunload', function() {
                 if (timer) clearTimeout(timer);
                 if (fallbackTimer) clearTimeout(fallbackTimer);
